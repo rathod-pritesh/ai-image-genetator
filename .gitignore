@@ -1,0 +1,16 @@
+# Environment variables
+.env
+.env.*
+myenv
+
+# Node / frontend
+node_modules/
+
+# Python
+__pycache__/
+venv/
+.envvenv/
+
+# Build outputs
+dist/
+build/
