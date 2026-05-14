@@ -1,102 +1,118 @@
 <script>
+  import Generator from '$lib/Generator.svelte';
+  import ImageDisplay from '$lib/ImageDisplay.svelte';
+  import FeatureCard from '$lib/FeatureCard.svelte';
+  import Logo from '$lib/ai-image-generator-logo.png';
+
   let prompt = "";
   let imageBase64 = "";
   let loading = false;
+  let error = "";
 
   async function generateImage() {
-    if (!prompt) return;
-
+    if (!prompt || loading) return;
     loading = true;
+    error = "";
     imageBase64 = "";
 
-    const res = await fetch("http://127.0.0.1:8000/generate-image", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt })
-    });
+    try {
+      const res = await fetch("http://127.0.0.1:8000/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt })
+      });
 
-    const data = await res.json();
+      if (!res.ok) throw new Error("The forge is currently cold. Please try again later.");
 
-    imageBase64 = data.image_base64;
-
-    loading = false;
-
-    console.log(data);
+      const data = await res.json();
+      imageBase64 = data.image_base64;
+      prompt = ""; 
+    } catch (err) {
+      error = "Connection lost: The AI service is currently unavailable.";
+    } finally {
+      loading = false;
+    }
   }
+
+  function handleKeyDown(event) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      generateImage();
+    }
+  }
+
   function handleDownload() {
     if (!imageBase64) return;
-
     const link = document.createElement("a");
-
     link.href = `data:image/jpeg;base64, ${imageBase64}`;
-
-    const fileName = prompt
-      ? prompt.slice(0, 20).replace(/[^a-z0-9]/gi, '_').toLowerCase()
-      : "ai-generated-image";
-
-    link.download = `${fileName}.webp`;
-
+    link.download = `pixelforge-${Date.now()}.webp`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   }
 </script>
 
-<div class="min-h-screen bg-gray-50 flex flex-col items-center p-4 md:p-8">
+<nav class="w-full bg-white border-b border-gray-100 py-6 px-6 md:px-12 flex justify-between items-center">
+  <div class="flex items-center">
+    <img src={Logo} alt="PixelForge Logo" class="h-20 md:h-24 w-auto object-contain" />
+  </div>
+  <div class="hidden md:flex gap-8 text-sm font-semibold text-gray-600 uppercase tracking-wider">
+    <a href="#generate" class="hover:text-indigo-600 transition-colors border-b-2 border-indigo-600 pb-1">Generator</a>
+    <a href="#how-it-works" class="hover:text-indigo-600 transition-colors pb-1">How it Works</a>
+  </div>
+</nav>
+
+<div id="generate" class="min-h-screen bg-gray-50 flex flex-col items-center p-4 md:p-8">
   <header class="w-full max-w-2xl text-center mb-10 mt-8">
-    <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900 tracking-tight">AI Image 
-      <span class="text-indigo-600">Generator</span>
+    <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900 tracking-tight">
+      AI Image <span class="text-indigo-600">Generator</span>
     </h1>
-    <p class="mt-3 text-gray-600">Turn your imagination into art in seconds.</p>
+    <p class="mt-3 text-gray-600 italic">"Where imagination meets the forge."</p>
   </header>
 
   <main class="w-full max-w-xl bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-    <div class="flex flex-col gap-4">
-    <div class="flex flex-col gap-2">
-      <label for="prompt" class="text-sm font-semibold text-gray-700">Prompt</label>
-      <textarea 
-        id="prompt"
-        rows="3"
-        class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none resize-none"
-        placeholder="Describe your image..."
-        bind:value={prompt}
-      ></textarea>
-    </div>
+    <!-- Generator Component -->
+    <Generator 
+      bind:prompt 
+      {loading} 
+      {error} 
+      {generateImage} 
+      {handleKeyDown} 
+    />
 
-    <button
-      class="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2"
-      on:click={generateImage}
-      disabled={loading || !prompt}
-    >
-      {#if loading}
-        <span class="animate-spin border-2 border-white border-t-transparent rounded-full w-5 h-5"></span>
-        Generating...
-      {:else}
-        Generate Image
-      {/if}
-    </button>
-  </div>
-
-  <div class="mt-8 flex flex-col items-center">
-    {#if loading}
-      <div class="w-full aspect-square bg-gray-100 animate-pulse rounded-xl flex items-center justify-center">
-        <p class="text-gray-400 font-medium">Processing your prompt...</p>
-      </div>
-    {/if}
-
-    {#if imageBase64}
-      <div class="group relative w-full">
-        <img 
-          src={"data:image/jpeg;base64," + imageBase64} 
-          alt="Generated Art"
-          class="w-full h-auto rounded-xl shadow-lg border border-gray-200 transition-transform duration-300 hover:scale-[1.01]"
-        />
-        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 rounded-xl flex items-center justify-center">
-          <button on:click={handleDownload} class="bg-white text-gray-900 px-4 py-2 roudned-lg font-semibold text-sm">Download</button>
-        </div>
-      </div>
-    {/if}
-  </div>
+    <!-- Image Display Component -->
+    <ImageDisplay 
+      {loading} 
+      {imageBase64} 
+      {handleDownload} 
+    />
   </main>
 
+  <section id="how-it-works" class="w-full max-w-4xl mt-20 mb-20">
+    <div class="text-center mb-12">
+        <h2 class="text-2xl font-bold text-gray-900">The PixelForge Process</h2>
+        <p class="text-gray-500">Fast, high-quality, and powered by Pollinations.ai</p>
+    </div>
+    <div class="grid md:grid-cols-3 gap-8">
+      <FeatureCard 
+        number="1" 
+        title="Input Prompt" 
+        description="Enter your vision into the forge's text field." 
+      />
+      <FeatureCard 
+        number="2" 
+        title="Forge" 
+        description="The AI strikes the pixels to create your unique artwork." 
+      />
+      <FeatureCard 
+        number="3" 
+        title="Download" 
+        description="Grab your creation and share it with the world." 
+      />
+    </div>
+  </section>
+
+  <footer class="text-gray-400 text-sm pb-8">
+    &copy; 2026 PixelForge Studio | Powered by Pollinations AI
+  </footer>
 </div>
